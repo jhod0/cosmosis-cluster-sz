@@ -5,9 +5,76 @@
 
 from __future__ import division, print_function
 from cluster_toolkit import pressure as pp
+from colossus.cosmology import cosmology as col_cosmo
+from colossus.halo import concentration, mass_defs
 from cosmosis.datablock import BlockError
 import numpy as np
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, interp2d
+
+
+def convert_mass(m, z, mdef_in='200c', mdef_out='200m',
+                 concentration_model='diemer19', profile='nfw'):
+    '''
+    Converts between mass definitions.
+    '''
+    c = concentration.concentration(m, mdef_in, z,
+                                    model=concentration_model,
+                                    conversion_profile=profile)
+    return mass_defs.changeMassDefinition(m, c, z, mdef_in, mdef_out,
+                                          profile=profile)[0]
+
+
+def package_toolkit_cosmology(sample):
+    cosmo = {}
+
+    for name in ['omega_b', 'omega_m', 'h0', 'n_s', 'sigma_8']:
+        cosmo[name] = float(sample['cosmological_parameters', name])
+    omega_m = cosmo['omega_m']
+    h0 = cosmo['h0']
+
+    # TODO make this robust to flat, non-flat, \Lambda- or w-CDM
+    col_cosmo.setCosmology('cluster_sz_cosmo',
+                           {'Om0': cosmo['omega_m'],
+                            'Ob0': cosmo['omega_b'],
+                            'H0': 100*cosmo['h0'],
+                            'sigma8': cosmo['sigma_8'],
+                            'ns': cosmo['n_s']})
+
+    # Load in table of comoving dist vs. redshift
+    cosmo['z_chi'] = sample['distances', 'z']
+    cosmo['chi'] = sample['distances', 'd_m']
+    cosmo['d_a'] = sample['distances', 'd_a']
+    cosmo['d_a_i'] = interp1d(cosmo['z_chi'], cosmo['d_a'])
+
+    # Get halo mass function
+    # NB: mass definition is _MEAN MASS OVERDENSITY_, not _CRITICAL MASS
+    # OVERDENSITY_
+    cosmo['hmf_z'] = sample['mass_function', 'z']
+    cosmo['hmf_m'] = sample['mass_function', 'm_h'] * omega_m / h0
+    cosmo['hmf_f'] = sample['mass_function', 'dndlnmh'] * h0**3
+
+    # (Convert to dn/dm from dn/d(lnm))
+    for i in range(cosmo['hmf_f'].shape[0]):
+        cosmo['hmf_f'][i, :] /= cosmo['hmf_m']
+    cosmo['hmf'] = interp2d(cosmo['hmf_m'], cosmo['hmf_z'], cosmo['hmf_f'])
+
+    # Get the halo mass bias
+    # As with HMF, NB: mass definition is _MEAN MASS OVERDENSITY_, not
+    # _CRITICAL MASS OVERDENSITY_
+    cosmo['hmb_z'] = sample['tinker_bias_function', 'z']
+    cosmo['hmb_m'] = np.exp(sample['tinker_bias_function', 'ln_mass_h'])/h0
+    cosmo['hmb_b'] = sample['tinker_bias_function', 'bias']
+    cosmo['hmb'] = interp2d(cosmo['hmb_m'], cosmo['hmb_z'], cosmo['hmb_b'])
+
+    # Get the matter power spectrum
+    cosmo['P_lin_k'] = sample['matter_power_lin', 'k_h'] * h0
+    cosmo['P_lin_z'] = sample['matter_power_lin', 'z']
+    cosmo['P_lin'] = sample['matter_power_lin', 'p_k'] / (h0**3)
+    cosmo['P_lin_i'] = interp2d(cosmo['P_lin_k'], cosmo['P_lin_z'],
+                                cosmo['P_lin'])
+
+    return cosmo
+
 
 blkname = 'cluster_sz'
 
@@ -73,21 +140,15 @@ def setup(options):
 
 
 def execute(sample, config):
-    # Take in cosmological parameters
+    # Sort cosmological parameters
+    cosmo = package_toolkit_cosmology(sample)
     dist_zs = sample['distances', 'z']
     das_interp = interp1d(dist_zs, sample['distances', 'd_a'])
-
-    omb = sample['cosmological_parameters', 'omega_b']
-    omm = sample['cosmological_parameters', 'omega_m']
-    h0 = sample['cosmological_parameters', 'h0']
 
     # Sort out profile parameters
     if config['type'] == 'battaglia':
         profile_cls = pp.BBPSProfile
-        profile_params = {'omega_b': omb,
-                          'omega_m': omm,
-                          'h': h0,
-                          'params_P_0': config['params_P_0'],
+        profile_params = {'params_P_0': config['params_P_0'],
                           'params_x_c': config['params_x_c'],
                           'params_beta': config['params_beta'],
                           'alpha': config['batt_alpha'],
@@ -108,31 +169,43 @@ def execute(sample, config):
 
     for iz, z in enumerate(zs):
         da = das_interp(z)
-        # Compute 2halo
-        # (TODO)
-        th = pp.TwoHaloProfile(omb, omm, h0,
-                               # hmb_m, hmb_z, hmb_b,
-                               # hmf_m, hmf_z, hmf_f,
-                               # P_lin_k, P_lin_z, P_lin,
-                               # mdelta_m, mdelta_c,
+
+        # Compute 2halo - only z dependent
+        # First, get a mean-to-critical mass definition table which we can use
+        # to interpolate the conversion
+        m200c_lo = convert_mass(cosmo['hmf_m'].min(), z,
+                                mdef_in='200m', mdef_out='200c')
+        m200c_hi = convert_mass(cosmo['hmf_m'].max(), z,
+                                mdef_in='200m', mdef_out='200c')
+        m200c = np.geomspace(m200c_lo * 0.99, m200c_hi * 1.01,
+                             cosmo['hmf_m'].size + 2)
+        m200m = convert_mass(m200c, z, mdef_in='200c', mdef_out='200m')
+        mean_to_crit = interp1d(m200m, m200c)
+
+        th = pp.TwoHaloProfile(cosmo, m200m, m200c,
                                one_halo=profile_cls,
                                one_halo_kwargs=profile_params)
         # TODO figure out good k spacing
         ks = np.geomspace(0.1, 10, 20)
+        print('computing 2h at z = {:.3e}...'.format(z))
         mass_indep_2h = th.convolved_y_FT(thetas, ks, z, da,
                                           sigma_beam=sigma_psf)
 
-        for iM, M in enumerate(Ms):
-            oh = profile_cls(M, z, **profile_params)
-
+        # Iterate over M200m
+        for iM, Mm in enumerate(Ms):
+            print('computing 1h of M200m = {:.3e}...'.format(Mm))
             # Compute 1halo
+            Mc = mean_to_crit(Mm)
+            oh = profile_cls(Mc, z, cosmo, **profile_params)
             theta_max = np.sqrt(2) * thetas.max()
             thetas_interp = interp1d(*oh.convolved_y(da, theta_max,
-                                                     sigma=sigma_psf))
+                                                     sigma_beam=sigma_psf))
             ys_1h[:, iM, iz] = thetas_interp(thetas)
             # TODO compute bias_at_M
+            bias_at_M = 1
             ys_2h[:, iM, iz] = bias_at_M * mass_indep_2h
 
+    # Save outputs
     sample[blkname, 'ys_2h'] = ys_2h
     sample[blkname, 'ys_1h'] = ys_1h
 
