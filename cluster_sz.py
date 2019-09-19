@@ -185,11 +185,19 @@ def execute(sample, config):
         th = pp.TwoHaloProfile(cosmo, m200m, m200c,
                                one_halo=profile_cls,
                                one_halo_kwargs=profile_params)
-        # TODO figure out good k spacing
-        ks = np.geomspace(0.1, 10, 20)
+
+        # Compute K spacing
+        nk = 100
+        theta_to_r = (da / 60) * (np.pi / 180)
+        rmax = thetas.max() * theta_to_r
+        rmin = thetas.min() * theta_to_r
+        ks = np.geomspace(1 / (4*np.pi*rmax), 2*np.pi/(rmin), nk)
         print('computing 2h at z = {:.3e}...'.format(z))
-        mass_indep_2h = th.convolved_y_FT(thetas, ks, z, da,
-                                          sigma_beam=sigma_psf)
+        # We need a higher epsabs precision for 2halo
+        mass_indep_2h = th.convolved_y_FT(thetas, da, z, ks,
+                                          sigma_beam=sigma_psf,
+                                          epsabs_re=1e-18,
+                                          epsrel=1e-1)
 
         # Iterate over M200m
         for iM, Mm in enumerate(Ms):
@@ -197,10 +205,15 @@ def execute(sample, config):
             # Compute 1halo
             Mc = mean_to_crit(Mm)
             oh = profile_cls(Mc, z, cosmo, **profile_params)
-            theta_max = np.sqrt(2) * thetas.max()
-            thetas_interp = interp1d(*oh.convolved_y(da, theta_max,
-                                                     sigma_beam=sigma_psf))
-            ys_1h[:, iM, iz] = thetas_interp(thetas)
+            # Convolve with analytic version - uses proj.-slice thm
+            # eps bounds avoid GSL error
+            thetamax = 60
+            small_thetas = thetas < thetamax
+            ys_1h[small_thetas, iM, iz] = oh.convolved_y(thetas[small_thetas],
+                                                         da,
+                                                         sigma_beam=sigma_psf,
+                                                         epsabs=1e-11,
+                                                         epsrel=1e-2)
             # TODO compute bias_at_M
             bias_at_M = 1
             ys_2h[:, iM, iz] = bias_at_M * mass_indep_2h
