@@ -187,11 +187,11 @@ def execute(sample, config):
                                one_halo_kwargs=profile_params)
 
         # Compute K spacing
-        nk = 100
+        nk = 1000
         theta_to_r = (da / 60) * (np.pi / 180)
-        rmax = thetas.max() * theta_to_r
+        # rmax = thetas.max() * theta_to_r
         rmin = thetas.min() * theta_to_r
-        ks = np.geomspace(1 / (4*np.pi*rmax), 2*np.pi/(rmin), nk)
+        ks = np.geomspace(5e-3, 2*np.pi/(rmin), nk)
         print('computing 2h at z = {:.3e}...'.format(z))
         # We need a higher epsabs precision for 2halo
         mass_indep_2h = th.convolved_y_FT(thetas, da, z, ks,
