@@ -79,11 +79,6 @@ def package_toolkit_cosmology(sample):
 blkname = 'cluster_sz'
 
 
-# TODO:
-#   * properly handle M200m v M200c
-#   * finish 2halo
-
-
 def setup(options):
     config = {}
     # Choose a type of 1halo profile

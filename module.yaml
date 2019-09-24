@@ -1,0 +1,71 @@
+name: cluster-sz
+version: 0.1
+purpose: Generate tables of Compton-y profiles of galaxy clusters, for later use by other modules.
+url: https://github.com/jhod0/cosmosis-cluster-sz
+interface: cluster_sz.py
+attribution: [Jackson ODonnell]
+
+description: |
+    Computes the Compton-y Sunyaev-Zeldovich observable for galaxy clusters,
+    based on a halo pressure profile.
+    The output is a grid of the Compton-y profile of a galaxy cluster at an
+    angle theta from the cluster center, for a halo of a given mass and
+    redshift. The 1-halo and 2-halo contributions are computed separately,
+    yielding two separate 3d arrays. See belows for details on the output
+    format.
+
+    To run, you should need CAMB, sigma_r, mf_tinker before cluster-sz in
+    your CosmoSIS pipeline. Additionally, you will need a module to compute
+    the Tinker halo bias, the expected output of which is described below.
+
+params:
+    profiletype: One-halo pressure profile model. Currently only "Battaglia" (https://ui.adsabs.harvard.edu/abs/2012ApJ...758...75B/abstract) is supported
+    A_P_0: Battaglia profile parameter, the pressure amplitude. Optional, default is Battaglia best fit.
+    am_P_0: Battaglia profile parameter, the pressure-mass power law index. Optional, default is Battaglia best fit.
+    az_P_0: Battaglia profile parameter, the pressure-redshift power law index. Optional, default is Battaglia best fit.
+    A_x_c: Battaglia profile parameter, the core amplitude. Optional, default is Battaglia best fit.
+    am_x_c: Battaglia profile parameter, the core-mass power law index. Optional, default is Battaglia best fit.
+    az_x_c: Battaglia profile parameter, the core-redshift power law index. Optional, default is Battaglia best fit.
+    A_beta: Battaglia profile parameter, the shape amplitude. Optional, default is Battaglia best fit.
+    am_beta: Battaglia profile parameter, the shape-mass power law index. Optional, default is Battaglia best fit.
+    az_beta: Battaglia profile parameter, the shape-redshift power law index . Optional, default is Battaglia best fit.
+    thetas: Array of angular bins at which to compute Compton-y profile, in arcmin.
+    sigma_psf: The standard deviation of the Gaussian point spread function, in arcmin.
+    Mmin: Float. The minimum halo mass, M_{200m} in M_{sun}.
+    Mmax: Float. The maximum halo mass, M_{200m} in M_{sun}.
+    nM: Int. The number of halo masses at which to compute Compton-y profiles. Optional, default 20.
+    zmin: Float. The minimum redshift.
+    zmax: Float. The maximum redshift.
+    nz: Int. The number of redshifts at which to compute Compton-y profiles. Optional, default 20.
+
+inputs:
+    cosmological_parameters:
+        omega_m: Matter fraction today.
+        omega_b: Baryon fraction today.
+        h0: The reduced Hubble constant.
+        n_s: Scalar index.
+        sigma_8: Amplitude of the linear matter power spectrum
+    distances:
+        z: Redshift grid, 1d array.
+        d_m: Comoving distance, 1d array.
+        d_a: Non-comoving angular diameter distance, 1d array.
+    mass_function:
+        z: Redshift grid, 1d array.
+        m_h: Halo masses, M_{200m} in M_{sun} * \Omega_m / h, 1d array.
+        dndlnmh: Halo mass function, halos per (Mpc/h)^3, 2d array.
+    tinker_bias_function:
+        z: Redshift grid, 1d array.
+        ln_mass_h: Halo masses, natural log of M_{200m} in M_{sun} * \Omega_m / h, 1d array.
+        bias: Halo mass bias, 2d grid.
+    matter_power_lin:
+        z: Redshift grid, 1d array.
+        k_h: Wavenumbers in h / Mpc, 1d array.
+        P_lin: Linear matter power spectrum in (Mpc / h)^3, 2d array.
+
+outputs:
+    cluster_sz:
+        ys_1h: The one-halo Compton-y term. A 3D array indexed by [theta, mass, redshift].
+        ys_2h: The two-halo Compton-y term. A 3D array indexed by [theta, mass, redshift].
+        Ms: The masses of the ys_[12]h grids.
+        zs: The redshifts of the ys_[12]h grids.
+        thetas: The angles (in arcmin) of the ys_[12]h grids.
