@@ -215,7 +215,7 @@ def execute(sample, config):
                                                          epsabs=1e-11,
                                                          epsrel=1e-2)
             # TODO compute bias_at_M
-            bias_at_M = 1
+            bias_at_M = cosmo['hmb'](Mm, z)
             ys_2h[:, iM, iz] = bias_at_M * mass_indep_2h
 
     # Save outputs
