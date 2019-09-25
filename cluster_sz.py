@@ -207,7 +207,7 @@ def execute(sample, config):
             ys_1h[small_thetas, iM, iz] = oh.convolved_y(thetas[small_thetas],
                                                          da,
                                                          sigma_beam=sigma_psf,
-                                                         epsabs=1e-11,
+                                                         epsabs=1e-10,
                                                          epsrel=1e-2)
             # TODO compute bias_at_M
             bias_at_M = cosmo['hmb'](Mm, z)
