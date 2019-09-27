@@ -84,39 +84,6 @@ def setup(options):
     # Choose a type of 1halo profile
     config['type'] = options[blkname, 'profiletype']
 
-    if config['type'] == 'battaglia':
-        # Battaglia pressure params
-        A_P_0 = options.get_double(blkname, 'A_P_0', default=18.1)
-        am_P_0 = options.get_double(blkname, 'am_P_0', default=0.154)
-        az_P_0 = options.get_double(blkname, 'az_P_0', default=-0.758)
-        config['params_P_0'] = (A_P_0, am_P_0, az_P_0)
-
-        # Battaglia scale radius params
-        A_x_c = options.get_double(blkname, 'A_x_c', default=0.497)
-        am_x_c = options.get_double(blkname, 'am_x_c', default=-0.00865)
-        az_x_c = options.get_double(blkname, 'az_x_c', default=0.731)
-        config['params_x_c'] = (A_x_c, am_x_c, az_x_c)
-
-        # Battaglia beta shape params
-        A_beta = options.get_double(blkname, 'A_beta', default=4.35)
-        am_beta = options.get_double(blkname, 'am_beta', default=0.0393)
-        az_beta = options.get_double(blkname, 'az_beta', default=0.415)
-        config['params_beta'] = (A_beta, am_beta, az_beta)
-
-        battaglia_opts = ['batt_alpha', 'batt_gamma']
-        # Best-fits from BBPS2
-        battaglia_defaults = [1, -0.3]
-
-        for o, dflt in zip(battaglia_opts, battaglia_defaults):
-            try:
-                config[o] = options.get_double(blkname, o, default=dflt)
-            except BlockError:
-                config[o] = options.get_int(blkname, o, default=dflt)
-    else:
-        msg = 'Invalid cluster pressure profile ({type}), must be one of {opts}'
-        raise ValueError(msg.format(type=config['type'],
-                                    opts=['battaglia']))
-
     # Observational parameters
     config['thetas'] = options[blkname, 'thetas']
     config['sigma_psf'] = options[blkname, 'sigma_psf']
@@ -131,11 +98,50 @@ def setup(options):
     nz = options.get_int(blkname, 'nz', default=20)
     config['zs'] = np.linspace(zmin, zmax, nz)
 
+    config['verbose'] = options.get_bool(blkname, 'verbose', True)
+
+    if config['verbose']:
+        print(config)
+
     return config
 
 
 def execute(sample, config):
     # Sort cosmological parameters
+
+    if config['type'] == 'battaglia':
+        # Battaglia pressure params
+        A_P_0 = sample.get_double(blkname, 'A_P_0', default=18.1)
+        am_P_0 = sample.get_double(blkname, 'am_P_0', default=0.154)
+        az_P_0 = sample.get_double(blkname, 'az_P_0', default=-0.758)
+        config['params_P_0'] = (A_P_0, am_P_0, az_P_0)
+
+        # Battaglia scale radius params
+        A_x_c = sample.get_double(blkname, 'A_x_c', default=0.497)
+        am_x_c = sample.get_double(blkname, 'am_x_c', default=-0.00865)
+        az_x_c = sample.get_double(blkname, 'az_x_c', default=0.731)
+        config['params_x_c'] = (A_x_c, am_x_c, az_x_c)
+
+        # Battaglia beta shape params
+        A_beta = sample.get_double(blkname, 'A_beta', default=4.35)
+        am_beta = sample.get_double(blkname, 'am_beta', default=0.0393)
+        az_beta = sample.get_double(blkname, 'az_beta', default=0.415)
+        config['params_beta'] = (A_beta, am_beta, az_beta)
+
+        battaglia_opts = ['batt_alpha', 'batt_gamma']
+        # Best-fits from BBPS2
+        battaglia_defaults = [1, -0.3]
+
+        for o, dflt in zip(battaglia_opts, battaglia_defaults):
+            try:
+                config[o] = sample.get_double(blkname, o, default=dflt)
+            except BlockError:
+                config[o] = sample.get_int(blkname, o, default=dflt)
+    else:
+        msg = 'Invalid cluster pressure profile ({type}), must be one of {opts}'
+        raise ValueError(msg.format(type=config['type'],
+                                    opts=['battaglia']))
+
     cosmo = package_toolkit_cosmology(sample)
     dist_zs = sample['distances', 'z']
     das_interp = interp1d(dist_zs, sample['distances', 'd_a'])
@@ -187,7 +193,8 @@ def execute(sample, config):
         # rmax = thetas.max() * theta_to_r
         rmin = thetas.min() * theta_to_r
         ks = np.geomspace(5e-3, 2*np.pi/(rmin), nk)
-        print('computing 2h at z = {:.3e}...'.format(z))
+        if config['verbose']:
+            print('computing 2h at z = {:.3e}...'.format(z))
         # We need a higher epsabs precision for 2halo
         mass_indep_2h = th.convolved_y_FT(thetas, da, z, ks,
                                           sigma_beam=sigma_psf,
@@ -196,7 +203,8 @@ def execute(sample, config):
 
         # Iterate over M200m
         for iM, Mm in enumerate(Ms):
-            print('computing 1h of M200m = {:.3e}...'.format(Mm))
+            if config['verbose']:
+                print('computing 1h of M200m = {:.3e}...'.format(Mm))
             # Compute 1halo
             Mc = mean_to_crit(Mm)
             oh = profile_cls(Mc, z, cosmo, **profile_params)

@@ -20,15 +20,7 @@ description: |
 
 params:
     profiletype: One-halo pressure profile model. Currently only "Battaglia" (https://ui.adsabs.harvard.edu/abs/2012ApJ...758...75B/abstract) is supported
-    A_P_0: Battaglia profile parameter, the pressure amplitude. Optional, default is Battaglia best fit.
-    am_P_0: Battaglia profile parameter, the pressure-mass power law index. Optional, default is Battaglia best fit.
-    az_P_0: Battaglia profile parameter, the pressure-redshift power law index. Optional, default is Battaglia best fit.
-    A_x_c: Battaglia profile parameter, the core amplitude. Optional, default is Battaglia best fit.
-    am_x_c: Battaglia profile parameter, the core-mass power law index. Optional, default is Battaglia best fit.
-    az_x_c: Battaglia profile parameter, the core-redshift power law index. Optional, default is Battaglia best fit.
-    A_beta: Battaglia profile parameter, the shape amplitude. Optional, default is Battaglia best fit.
-    am_beta: Battaglia profile parameter, the shape-mass power law index. Optional, default is Battaglia best fit.
-    az_beta: Battaglia profile parameter, the shape-redshift power law index . Optional, default is Battaglia best fit.
+    verbose: Whether to print progress updates. Boolean, default True.
     thetas: Array of angular bins at which to compute Compton-y profile, in arcmin.
     sigma_psf: The standard deviation of the Gaussian point spread function, in arcmin.
     Mmin: Float. The minimum halo mass, M_{200m} in M_{sun}.
@@ -39,6 +31,16 @@ params:
     nz: Int. The number of redshifts at which to compute Compton-y profiles. Optional, default 20.
 
 inputs:
+    cluster_sz:
+        A_P_0: Battaglia profile parameter, the pressure amplitude. Optional, default is Battaglia best fit.
+        am_P_0: Battaglia profile parameter, the pressure-mass power law index. Optional, default is Battaglia best fit.
+        az_P_0: Battaglia profile parameter, the pressure-redshift power law index. Optional, default is Battaglia best fit.
+        A_x_c: Battaglia profile parameter, the core amplitude. Optional, default is Battaglia best fit.
+        am_x_c: Battaglia profile parameter, the core-mass power law index. Optional, default is Battaglia best fit.
+        az_x_c: Battaglia profile parameter, the core-redshift power law index. Optional, default is Battaglia best fit.
+        A_beta: Battaglia profile parameter, the shape amplitude. Optional, default is Battaglia best fit.
+        am_beta: Battaglia profile parameter, the shape-mass power law index. Optional, default is Battaglia best fit.
+        az_beta: Battaglia profile parameter, the shape-redshift power law index . Optional, default is Battaglia best fit.
     cosmological_parameters:
         omega_m: Matter fraction today.
         omega_b: Baryon fraction today.
