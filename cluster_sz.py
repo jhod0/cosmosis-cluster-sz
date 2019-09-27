@@ -196,10 +196,16 @@ def execute(sample, config):
         if config['verbose']:
             print('computing 2h at z = {:.3e}...'.format(z))
         # We need a higher epsabs precision for 2halo
-        mass_indep_2h = th.convolved_y_FT(thetas, da, z, ks,
-                                          sigma_beam=sigma_psf,
-                                          epsabs_re=1e-18,
-                                          epsrel=1e-1)
+        try:
+            mass_indep_2h = th.convolved_y_FT(thetas, da, z, ks,
+                                              sigma_beam=sigma_psf,
+                                              epsabs_re=1e-18,
+                                              epsrel=1e-1)
+        except:
+            print('error doing 2halo')
+            print('cosmo = ', cosmo)
+            print('1halo params = ', profile_params)
+            raise
 
         # Iterate over M200m
         for iM, Mm in enumerate(Ms):
