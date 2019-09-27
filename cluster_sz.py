@@ -192,7 +192,7 @@ def execute(sample, config):
         theta_to_r = (da / 60) * (np.pi / 180)
         # rmax = thetas.max() * theta_to_r
         rmin = thetas.min() * theta_to_r
-        ks = np.geomspace(5e-3, 2*np.pi/(rmin), nk)
+        ks = np.geomspace(5e-5, 2*np.pi/(rmin), nk)
         if config['verbose']:
             print('computing 2h at z = {:.3e}...'.format(z))
         # We need a higher epsabs precision for 2halo
